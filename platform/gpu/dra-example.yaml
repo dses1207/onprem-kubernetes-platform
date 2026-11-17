@@ -1,0 +1,32 @@
+# DRA 驗證用: 申請一張整片 GPU 跑 nvidia-smi
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: one-gpu
+  namespace: ai
+spec:
+  spec:
+    devices:
+      requests:
+        - name: gpu
+          exactly:
+            deviceClassName: gpu.nvidia.com
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gpu-dra-test
+  namespace: ai
+spec:
+  restartPolicy: Never
+  runtimeClassName: nvidia
+  resourceClaims:
+    - name: gpu
+      resourceClaimTemplateName: one-gpu
+  containers:
+    - name: smi
+      image: docker.io/nvidia/cuda:12.8.0-base-ubuntu24.04
+      command: ["nvidia-smi", "-L"]
+      resources:
+        claims:
+          - name: gpu

@@ -1,0 +1,41 @@
+# Longhorn 定期快照 / 備份 (備份目標為 S3 相容物件儲存)
+#
+# 使用方式: PVC 加 label 即可加入群組, 不必改 Longhorn 設定
+#   metadata.labels:
+#     recurring-job-group.longhorn.io/db: enabled     # 資料庫: 每 6 小時快照保留 4 份 + 每天 02:00 備份保留 7 份
+#     recurring-job-group.longhorn.io/daily: enabled  # 一般資料: 每天 03:00 備份, 保留 3 份
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: db-snapshot-6h
+  namespace: longhorn-system
+spec:
+  task: snapshot
+  cron: "0 */6 * * *"
+  retain: 4
+  concurrency: 2
+  groups: ["db"]
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: db-backup-daily
+  namespace: longhorn-system
+spec:
+  task: backup
+  cron: "0 2 * * *"
+  retain: 7
+  concurrency: 2
+  groups: ["db"]
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: daily-backup
+  namespace: longhorn-system
+spec:
+  task: backup
+  cron: "0 3 * * *"
+  retain: 3
+  concurrency: 2
+  groups: ["daily"]

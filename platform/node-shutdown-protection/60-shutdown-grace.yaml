@@ -1,0 +1,13 @@
+# RKE2 設定片段: 讓 kubelet 讀取關機寬限期設定
+#
+# 部署位置: /etc/rancher/rke2/config.yaml.d/60-shutdown-grace.yaml
+#
+# 為何用 config.yaml.d 而非直接改 config.yaml:
+#   1. 節點上沒有 config.yaml, 只有 Rancher 產生的 config.yaml.d/50-rancher.yaml
+#   2. 編號 60 > 50, 會在 Rancher 的設定之後套用, 且不會被 Rancher 覆寫
+#
+# 注意: RKE2 不支援 --shutdown-grace-period CLI flag (rancher/rke2#4686),
+# 必須透過 kubelet config 檔傳遞。
+
+kubelet-arg:
+  - "config=/etc/rancher/rke2/kubelet-shutdown-config.yaml"

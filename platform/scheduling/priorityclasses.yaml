@@ -1,0 +1,21 @@
+# AI 工作負載的 PriorityClass (叢集層級, 由平台方建)
+# 資源吃緊時 scheduler 會先驅逐低優先的訓練 Pod, 保住推論。
+# 數值刻意遠低於 system-cluster-critical (2000000000), 不會影響系統元件。
+# 使用: Pod spec 加 priorityClassName: inference 或 training
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: inference
+value: 100000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "推論服務: 高優先, 可搶占訓練 Pod"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: training
+value: 1000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "訓練工作: 低優先, 資源吃緊時先被驅逐"

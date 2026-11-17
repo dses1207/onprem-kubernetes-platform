@@ -1,0 +1,36 @@
+# 關機前自動 drain 本節點, 把 pod 有秩序地搬走再關機。
+#
+# 部署位置: /etc/systemd/system/rke2-drain-on-shutdown.service
+#
+# 這是 shutdownGracePeriod 之外的「第二道防線」:
+#   - shutdownGracePeriod 只保證 pod 有時間關閉, 但 pod 仍留在本機
+#   - drain 則主動把 workload 搬到其他節點, 並讓 Longhorn 有機會
+#     乾淨地 detach volume
+#
+# 運作方式: Type=oneshot + RemainAfterExit=yes, 開機時 ExecStart 什麼都不做,
+# 關機時才執行 ExecStop。Before=shutdown.target 確保它早於系統關閉流程。
+#
+# 已知限制 (誠實說明 —— 這是社群做法, 非 Longhorn 官方提供):
+#   1. 需要能連到 API server。整個叢集同時關機時此 unit 會失敗。
+#   2. 會讓關機變慢, 最多 TimeoutStopSec 秒。
+#   3. `reboot -f` 或硬體斷電會完全繞過。
+
+[Unit]
+Description=Drain this node before shutdown to flush Longhorn volumes
+Documentation=https://github.com/longhorn/longhorn/issues/7206
+DefaultDependencies=no
+Before=shutdown.target reboot.target halt.target
+After=network-online.target rke2-agent.service rke2-server.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+ExecStop=/usr/local/bin/rke2-drain-node.sh
+# 上限 4 分鐘: 略少於 drain 腳本自身的 240s timeout, 避免 systemd
+# 在腳本收尾前就強制中斷。
+TimeoutStopSec=270
+
+[Install]
+WantedBy=multi-user.target

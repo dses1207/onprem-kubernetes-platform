@@ -1,0 +1,34 @@
+# RKE2 kubelet 關機寬限期設定
+#
+# 部署位置: /etc/rancher/rke2/kubelet-shutdown-config.yaml
+# 由 /etc/rancher/rke2/config.yaml.d/60-shutdown-grace.yaml 以 kubelet-arg 引用。
+#
+# 目的: 節點關機時, 給 pod 時間把記憶體中的髒資料寫回磁碟並乾淨卸載,
+# 避免 ext4 metadata 寫到一半被腰斬。
+#
+# 背景: RKE2/k3s 的 killall 流程「不會」優雅地 detach Longhorn volume
+# (longhorn/longhorn#7206, maintainer 確認, 標記 wontfix —— 屬設計缺口)。
+# engine 進程先死但 ext4 仍掛載且 page cache 有 dirty page, 導致
+# "EXT4-fs: I/O error while writing superblock" 與 extent checksum 不符。
+#
+# ⚠️ 關鍵前提: 本設定的秒數受 systemd logind 的 InhibitDelayMaxSec 上限箝制。
+# K8s 官方文件: "Graceful node shutdown on Linux relies on systemd inhibitor
+# locks to delay shutdown." 若 InhibitDelayMaxSec 維持預設 30s, 這裡設 180s
+# 也「只會拿到 30s」—— 必須同步調高 logind 設定, 見部署腳本。
+#
+# 限制: `reboot -f`、硬體斷電、VM 強制關機都會繞過 inhibitor lock。
+# 因此另有 rke2-drain-on-shutdown.service 作為第二道防線。
+# K8s 官方對計畫性重開機的建議仍是「先 cordon + drain」, graceful shutdown
+# 是給非預期關機兜底用的, 兩者互補而非二選一。
+
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+
+# 總寬限期。需 <= logind 的 InhibitDelayMaxSec (本專案同步設為 300s)。
+# 180s 涵蓋 PostgreSQL / RabbitMQ / Redis 等有狀態服務的 checkpoint 時間。
+shutdownGracePeriod: 180s
+
+# 其中保留給 critical pod (system-cluster-critical 等) 的秒數,
+# 必須小於 shutdownGracePeriod。
+# 一般 pod 先關 (180-60=120s), 最後 60s 才關 critical pod。
+shutdownGracePeriodCriticalPods: 60s

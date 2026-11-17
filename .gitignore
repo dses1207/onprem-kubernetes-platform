@@ -1,0 +1,17 @@
+# 去識別化關鍵字清單（本身就是敏感資訊）
+.denylist
+
+# 機密與憑證
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*kubeconfig*
+*.env
+secrets/
+
+# 編輯器 / 系統
+.DS_Store
+.idea/
+.vscode/
